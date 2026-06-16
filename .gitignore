@@ -1,0 +1,9 @@
+*.o
+*.out
+*.exe
+bobisdft
+core/tests/test_diary
+core/tests/test_date_utils
+core/tests/test_sanitize
+core/tests/test_storage
+data/
