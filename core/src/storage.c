@@ -126,25 +126,60 @@ bool load_entry(Date date, DiaryEntry *out) {
     fseek(f, (long)data_start, SEEK_SET);
     entry_clear(out);
 
-    fread(&out->date.year, sizeof(out->date.year), 1, f);
-    fread(&out->date.month, sizeof(out->date.month), 1, f);
-    fread(&out->date.day, sizeof(out->date.day), 1, f);
+    /* On-disk data is untrusted: the XOR-8 checksum only detects accidental
+     * corruption, so check every read and validate before using anything. */
+    bool ok = true;
+    ok = ok && fread(&out->date.year, sizeof(out->date.year), 1, f) == 1;
+    ok = ok && fread(&out->date.month, sizeof(out->date.month), 1, f) == 1;
+    ok = ok && fread(&out->date.day, sizeof(out->date.day), 1, f) == 1;
 
     char title_buf[MAX_TITLE_LEN];
-    fread(title_buf, 1, MAX_TITLE_LEN, f);
+    ok = ok && fread(title_buf, 1, MAX_TITLE_LEN, f) == MAX_TITLE_LEN;
+
+    uint32_t content_len = 0;
+    ok = ok && fread(&content_len, sizeof(content_len), 1, f) == 1;
+
+    /* Reject short reads and out-of-range dates: out->date.month drives
+     * MONTH_NAMES[month-1] in the renderer. */
+    if (!ok || !date_valid(out->date)) {
+        free(data);
+        fclose(f);
+        return false;
+    }
+
     title_buf[MAX_TITLE_LEN - 1] = '\0';
     snprintf(out->title, MAX_TITLE_LEN, "%s", title_buf);
 
-    uint32_t content_len;
-    fread(&content_len, sizeof(content_len), 1, f);
+    /* content_len is attacker-controlled. Require it to match exactly the
+     * bytes still present in the file; otherwise a forged large value would
+     * trigger an oversized malloc and a short fread would leave uninitialized
+     * heap that later gets printed (information disclosure). */
+    long content_pos = ftell(f);
+    size_t remaining = (content_pos >= 0 && file_size >= content_pos)
+                           ? (size_t)(file_size - content_pos)
+                           : 0;
+    if (content_len != remaining) {
+        free(data);
+        fclose(f);
+        return false;
+    }
 
     if (content_len > 0) {
         out->content = (char *)malloc((size_t)content_len + 1);
-        if (out->content) {
-            fread(out->content, 1, content_len, f);
-            out->content[content_len] = '\0';
-            out->content_len = content_len;
+        if (!out->content) {
+            free(data);
+            fclose(f);
+            return false;
         }
+        if (fread(out->content, 1, content_len, f) != content_len) {
+            free(out->content);
+            out->content = NULL;
+            free(data);
+            fclose(f);
+            return false;
+        }
+        out->content[content_len] = '\0';
+        out->content_len = content_len;
     }
 
     free(data);

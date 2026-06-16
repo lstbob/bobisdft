@@ -5,6 +5,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <stdlib.h>
+#include <stdint.h>
 
 static int tests_run = 0;
 static int tests_failed = 0;
@@ -74,6 +75,114 @@ static void test_checksum_corruption(void) {
     PASS();
 }
 
+/*
+ * Write a raw .bobisd file with a correct header and recomputed checksum but
+ * caller-supplied date/title/content bytes, so we can forge a structurally
+ * valid yet hostile record. content_len is written verbatim (not derived from
+ * content_nbytes) so we can simulate a forged length. MAGIC/VERSION mirror
+ * storage.c intentionally.
+ */
+static void write_raw_entry(const char *path, Date date, const char *title,
+                            uint32_t content_len, const void *content,
+                            size_t content_nbytes) {
+    uint8_t data[12 + MAX_TITLE_LEN + 4 + 4096];
+    size_t pos = 0;
+    memcpy(data + pos, &date.year, sizeof(int));  pos += sizeof(int);
+    memcpy(data + pos, &date.month, sizeof(int)); pos += sizeof(int);
+    memcpy(data + pos, &date.day, sizeof(int));   pos += sizeof(int);
+
+    char title_buf[MAX_TITLE_LEN];
+    memset(title_buf, 0, sizeof(title_buf));
+    snprintf(title_buf, sizeof(title_buf), "%s", title ? title : "");
+    memcpy(data + pos, title_buf, MAX_TITLE_LEN); pos += MAX_TITLE_LEN;
+
+    memcpy(data + pos, &content_len, sizeof(content_len)); pos += sizeof(content_len);
+    if (content && content_nbytes > 0) {
+        memcpy(data + pos, content, content_nbytes);
+        pos += content_nbytes;
+    }
+
+    uint8_t sum = 0;
+    for (size_t k = 0; k < pos; k++) sum ^= data[k];
+
+    FILE *f = fopen(path, "wb");
+    if (!f) return;
+    uint32_t magic = 0x44494152;
+    uint8_t version = 1;
+    fwrite(&magic, sizeof(magic), 1, f);
+    fwrite(&version, sizeof(version), 1, f);
+    fputc((int)sum, f);
+    fwrite(data, 1, pos, f);
+    fclose(f);
+}
+
+/* A content_len larger than the bytes actually present must be rejected, not
+ * trusted into an oversized malloc + short read that exposes heap memory. */
+static void test_forged_content_len(void) {
+    TEST("rejects forged content_len");
+    Date d = {2026, 8, 15};
+    const char actual[] = "hi";   /* only 2 bytes present */
+    const char *path = "data/2026-08-15.bobisd";
+    write_raw_entry(path, d, "Title", 0x10000u, actual, sizeof(actual) - 1);
+
+    DiaryEntry loaded;
+    entry_clear(&loaded);
+    ASSERT(!load_entry(d, &loaded), "forged content_len must be rejected");
+    entry_free(&loaded);
+    unlink(path);
+    PASS();
+}
+
+/* A content_len smaller than the trailing bytes is also inconsistent. */
+static void test_short_content_len(void) {
+    TEST("rejects undersized content_len");
+    Date d = {2026, 8, 16};
+    const char actual[] = "abcdefgh";
+    const char *path = "data/2026-08-16.bobisd";
+    write_raw_entry(path, d, "Title", 2u, actual, sizeof(actual) - 1);
+
+    DiaryEntry loaded;
+    entry_clear(&loaded);
+    ASSERT(!load_entry(d, &loaded), "inconsistent content_len must be rejected");
+    entry_free(&loaded);
+    unlink(path);
+    PASS();
+}
+
+/* An honest record forged by hand must still load (sanity for the helper). */
+static void test_raw_roundtrip(void) {
+    TEST("hand-forged honest record loads");
+    Date d = {2026, 8, 17};
+    const char body[] = "valid body";
+    const char *path = "data/2026-08-17.bobisd";
+    write_raw_entry(path, d, "Hello", (uint32_t)(sizeof(body) - 1), body, sizeof(body) - 1);
+
+    DiaryEntry loaded;
+    entry_clear(&loaded);
+    ASSERT(load_entry(d, &loaded), "consistent record should load");
+    ASSERT_STR_EQ(loaded.title, "Hello", "title");
+    ASSERT_STR_EQ(loaded.content, "valid body", "content");
+    entry_free(&loaded);
+    unlink(path);
+    PASS();
+}
+
+/* An out-of-range month would index MONTH_NAMES[-1] in the renderer. */
+static void test_bogus_date_rejected(void) {
+    TEST("rejects out-of-range date");
+    Date stored = {2026, 0, 15};   /* month 0 */
+    const char *path = "data/2026-08-18.bobisd";
+    write_raw_entry(path, stored, "T", 0u, NULL, 0);
+
+    Date lookup = {2026, 8, 18};
+    DiaryEntry loaded;
+    entry_clear(&loaded);
+    ASSERT(!load_entry(lookup, &loaded), "bogus stored date must be rejected");
+    entry_free(&loaded);
+    unlink(path);
+    PASS();
+}
+
 static void test_cleanup(void) {
     TEST("cleanup");
     unlink("data/2026-07-04.bobisd");
@@ -87,6 +196,10 @@ int main(void) {
     test_save_and_load();
     test_entry_exists();
     test_checksum_corruption();
+    test_forged_content_len();
+    test_short_content_len();
+    test_raw_roundtrip();
+    test_bogus_date_rejected();
     test_cleanup();
 
     printf("\n%d tests, %d failed\n", tests_run, tests_failed);
