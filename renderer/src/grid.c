@@ -28,7 +28,7 @@ static void print_trunc(const char *s, int max_width) {
     }
 }
 
-static int days_in_month(int year, int month) {
+int days_in_month(int year, int month) {
     int dim[] = {31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};
     if (month == 2 && ((year % 4 == 0 && year % 100 != 0) || year % 400 == 0)) {
         return 29;
@@ -53,7 +53,7 @@ void grid_draw_day(const DiaryEntry *entry, TermSize term) {
     }
 }
 
-static int col_width(TermSize term) {
+int col_width(TermSize term) {
     int w = (term.cols - 8) / 7;
     if (w < 8) w = 8;
     return w;

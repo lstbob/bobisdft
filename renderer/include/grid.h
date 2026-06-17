@@ -18,4 +18,7 @@ void grid_draw_day(const DiaryEntry *entry, TermSize term);
 void grid_draw_week(DiaryEntry entries[7], int count, TermSize term);
 void grid_draw_month(int year, int month, const Date *entries, int entry_count, TermSize term);
 
+int col_width(TermSize term);
+int days_in_month(int year, int month);
+
 #endif

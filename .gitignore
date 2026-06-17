@@ -6,4 +6,7 @@ core/tests/test_diary
 core/tests/test_date_utils
 core/tests/test_sanitize
 core/tests/test_storage
+core/tests/test_editor
+renderer/tests/test_grid
+renderer/tests/test_tui
 data/

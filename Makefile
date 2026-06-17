@@ -17,12 +17,16 @@ $(TARGET): $(OBJ)
 %.o: %.c
 	$(CC) $(CFLAGS) $(INC) -c $< -o $@
 
-clean:
-	rm -f $(OBJ) $(TARGET) core/tests/test_diary core/tests/test_date_utils core/tests/test_sanitize core/tests/test_storage
+TEST_BINS = core/tests/test_diary core/tests/test_date_utils core/tests/test_sanitize \
+            core/tests/test_storage core/tests/test_editor \
+            renderer/tests/test_grid renderer/tests/test_tui
 
-test: $(TARGET) core/tests/test_diary core/tests/test_date_utils core/tests/test_sanitize core/tests/test_storage
+clean:
+	rm -f $(OBJ) $(TARGET) $(TEST_BINS)
+
+test: $(TARGET) $(TEST_BINS)
 	@failed=0; \
-	for t in core/tests/test_diary core/tests/test_date_utils core/tests/test_sanitize core/tests/test_storage; do \
+	for t in $(TEST_BINS); do \
 		echo "=== $$t ==="; \
 		./$$t || failed=1; \
 		echo; \
@@ -39,6 +43,15 @@ core/tests/test_sanitize: core/tests/test_sanitize.c core/src/sanitize.c
 	$(CC) $(CFLAGS) $(INC) -o $@ $^
 
 core/tests/test_storage: core/tests/test_storage.c core/src/storage.c core/src/date_utils.c core/src/diary.c core/src/input.c core/src/sanitize.c
+	$(CC) $(CFLAGS) $(INC) -o $@ $^
+
+core/tests/test_editor: core/tests/test_editor.c core/src/editor.c core/src/input.c core/src/sanitize.c
+	$(CC) $(CFLAGS) $(INC) -o $@ $^
+
+renderer/tests/test_grid: renderer/tests/test_grid.c renderer/src/grid.c renderer/src/tui.c core/src/date_utils.c core/src/diary.c core/src/storage.c core/src/input.c core/src/sanitize.c
+	$(CC) $(CFLAGS) $(INC) -o $@ $^
+
+renderer/tests/test_tui: renderer/tests/test_tui.c renderer/src/tui.c
 	$(CC) $(CFLAGS) $(INC) -o $@ $^
 
 .PHONY: all clean test
