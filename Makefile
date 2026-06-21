@@ -1,7 +1,7 @@
 CC       = gcc
 CFLAGS   = -std=c11 -D_GNU_SOURCE -Wall -Wextra -Wpedantic -Werror -Wno-unused-result -O2 -D_FORTIFY_SOURCE=2
 LDFLAGS  =
-TARGET   = bobisdft
+TARGET   = ohbobidft
 
 CORE_SRC  = $(wildcard core/src/*.c)
 RENDER_SRC = $(wildcard renderer/src/*.c)

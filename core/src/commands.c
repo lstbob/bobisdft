@@ -47,7 +47,10 @@ static bool entry_day_interactive(Date date, bool *skipped) {
     printf("Title: ");
     fflush(stdout);
     char title[MAX_TITLE_LEN];
-    if (!read_line_nonempty(title, sizeof(title))) return false;
+    if (!read_line(title, sizeof(title)) || title[0] == '\0') {
+        printf("Cancelled.\n");
+        return false;
+    }
 
     printf("Opening editor to write content...\n");
     char *content = NULL;
@@ -121,20 +124,26 @@ static bool edit_entry_interactive(Date date) {
     return true;
 }
 
-static Date prompt_date(void) {
-    printf("Date for entry (Enter for tomorrow, or type a date): ");
+static Date prompt_date_default(Date def) {
+    char ds[MAX_DATE_STR_LEN];
+    format_date("long", def, ds, sizeof(ds));
+    printf("Date for entry (Enter for %s, or type a date): ", ds);
     fflush(stdout);
 
     char input[128];
     if (!read_line(input, sizeof(input)) || input[0] == '\0') {
-        return date_tomorrow();
+        return def;
     }
 
     Date d;
     if (parse_date(input, &d)) return d;
 
-    printf("Could not parse date. Using tomorrow.\n");
-    return date_tomorrow();
+    printf("Could not parse date. Using %s.\n", ds);
+    return def;
+}
+
+static Date prompt_date(void) {
+    return prompt_date_default(date_tomorrow());
 }
 
 int cmd_ne(int argc, char *argv[]) {
@@ -261,7 +270,7 @@ int cmd_se(int argc, char *argv[]) {
                "  " ANSI_DIM "[" ANSI_RESET ANSI_BOLD ANSI_GREEN "i" ANSI_RESET ANSI_DIM "]" ANSI_RESET "%s"
                "  " ANSI_DIM "[" ANSI_RESET ANSI_BOLD ANSI_GREEN "n" ANSI_RESET ANSI_DIM "]next" ANSI_RESET
                "  " ANSI_DIM "[" ANSI_RESET ANSI_BOLD ANSI_GREEN "N" ANSI_RESET ANSI_DIM "]prev" ANSI_RESET
-               "  " ANSI_DIM "[" ANSI_RESET ANSI_BOLD ANSI_GREEN "e" ANSI_RESET ANSI_DIM "]edit" ANSI_RESET
+               "  " ANSI_DIM "[" ANSI_RESET ANSI_BOLD ANSI_GREEN "e" ANSI_RESET ANSI_DIM "]entry" ANSI_RESET
                "  " ANSI_DIM "[" ANSI_RESET ANSI_BOLD ANSI_RED "q" ANSI_RESET ANSI_DIM "]quit" ANSI_RESET,
                view == VIEW_DAILY ? " weekly" : (view == VIEW_WEEKLY ? " monthly" : " daily"));
         printf("\n");
@@ -301,7 +310,8 @@ int cmd_se(int argc, char *argv[]) {
             case 'e': {
                 raw_mode_disable();
                 printf("\n");
-                edit_entry_interactive(cursor);
+                Date d = prompt_date_default(cursor);
+                entry_day_interactive(d, NULL);
                 raw_mode_enable();
                 break;
             }

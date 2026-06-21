@@ -7,16 +7,17 @@
 #define VERSION "0.1.0"
 
 static void print_usage(void) {
-    printf("bobisdft -- personal diary v%s\n", VERSION);
+    printf("ohbobi d -- personal diary v%s\n", VERSION);
     printf("Usage:\n");
-    printf("  bobisdft ne          New entry (default: tomorrow)\n");
-    printf("  bobisdft ne -w       New entries for the week\n");
-    printf("  bobisdft se          Show entries grid\n");
-    printf("  bobisdft se -d DATE  Show grid starting at DATE\n");
-    printf("  bobisdft ee          Edit existing entry\n");
-    printf("  bobisdft ee -d DATE  Edit entry for DATE\n");
-    printf("  bobisdft -h, --help  Show this help\n");
-    printf("  bobisdft -v, --version  Show version\n");
+    printf("  ohbobi d              Show entries grid (default)\n");
+    printf("  ohbobi d ne           New entry (default: tomorrow)\n");
+    printf("  ohbobi d ne -w        New entries for the week\n");
+    printf("  ohbobi d se           Show entries grid\n");
+    printf("  ohbobi d se -d DATE   Show grid starting at DATE\n");
+    printf("  ohbobi d ee           Edit existing entry\n");
+    printf("  ohbobi d ee -d DATE   Edit entry for DATE\n");
+    printf("  ohbobi d -h, --help   Show this help\n");
+    printf("  ohbobi d -v, --version Show version\n");
 }
 
 int main(int argc, char *argv[]) {
@@ -26,8 +27,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (argc < 2) {
-        print_usage();
-        return 1;
+        return cmd_se(argc, argv);
     }
 
     if (strcmp(argv[1], "-h") == 0 || strcmp(argv[1], "--help") == 0) {
@@ -36,7 +36,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (strcmp(argv[1], "-v") == 0 || strcmp(argv[1], "--version") == 0) {
-        printf("bobisdft v%s\n", VERSION);
+        printf("ohbobi d (diary) v%s\n", VERSION);
         return 0;
     }
 
