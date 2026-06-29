@@ -311,7 +311,8 @@ int cmd_se(int argc, char *argv[]) {
                 raw_mode_disable();
                 printf("\n");
                 Date d = prompt_date_default(cursor);
-                entry_day_interactive(d, NULL);
+                if (entry_exists(d)) edit_entry_interactive(d);
+                else                 entry_day_interactive(d, NULL);
                 raw_mode_enable();
                 break;
             }
